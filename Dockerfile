@@ -1,5 +1,8 @@
 FROM jenkins/ssh-slave:latest
 
+# Set version
+ENV JENKINS_AGENT_VERSION 1.0.0
+
 # Install packages
 RUN apt-get update && \
     apt-get -y install apt-transport-https \
