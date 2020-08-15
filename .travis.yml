@@ -1,5 +1,3 @@
-sudo: required
-
 language: node_js
 node_js:
     - "12"
@@ -10,24 +8,38 @@ services:
 env:
   global:
     - IMAGE_NAME=$DOCKER_USER/jenkins-agent
-      
+
 before_script:
+  # Get version information about jenkins master
   - VERSION="$(awk '$2 == "JENKINS_AGENT_VERSION" { print $3; exit }' Dockerfile)"
+  # Confirm presence of docker
   - docker info
-  - docker pull "$IMAGE_NAME" || true
 
-install:
-  - echo "install nothing!"
+stages:
+  - name: build
+    if: branch = master
 
-script:
-  - docker build -t $IMAGE_NAME .
+jobs:
+  include:
+    - stage: build
+      script:
+        - echo 'Building jenkins-agent'
+        - docker build -t $IMAGE_NAME .
+        - docker images
+        - echo 'Pushing jenkins-agent docker image to dockerhub'
+        - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+        - docker tag $IMAGE_NAME $IMAGE_NAME:latest
+        - docker tag $IMAGE_NAME $IMAGE_NAME:$VERSION
+        - docker push $IMAGE_NAME:latest
+        - docker push $IMAGE_NAME:$VERSION
+        - echo 'Pushed jenkins-agent docker image to dockerhub'
 
-after_script:
-  - docker images
-
-after_success:
-  - docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-  - docker tag $IMAGE_NAME $IMAGE_NAME:latest
-  - docker tag $IMAGE_NAME $IMAGE_NAME:$VERSION
-  - docker push $IMAGE_NAME:latest
-  - docker push $IMAGE_NAME:$VERSION
+notifications:
+  email: false
+  slack: 
+    rooms:
+      secure: SVUCuliv5s54Uqok+ZfwUl3xPXT4aI5mu+GeRFjZ5G0O7skoPY0vGWg8cAIX1UIMSy886ERaKnD5cqt2gYKDRbKA2vkojECiJjg0UBM8dibt2cFItzB80b2oI0mJ8RMM3+4bpKcJeJWSs4WEd0mqCv2hRE7QmGxI1cNHGW8oYzo7/Dr6mgFhXeYZA3YLnmz8p1UNcfrnXM6tpuS7rlve8bzyumrGHeitpemH4hUCUSfYcXRYEy4S+vpSuYBlWWhlElWXTX0EAmWXdOrQRjG4zvx2p/ra4IAOQ1ACPqnee8BgOdHHDLaz+QcJGdT9DKVoCFhDB94DhbkLSEQjR2p9FRcX9haDzzMWIi6g84g4o9kYEdHhYUcEn6TDn30Y/0wN733ERlS6X0q4uyDfh8045RAb0AL40Tg4jXuL4zri+7w9qieoasts8hgd2jHkIU6MvjLH2vWSb/z+w8cFPgXt6PzWZqQeiXwiOLUNn1MTUPc4C30RDo+KREpW1k3oTbem1kJL8wwhW5e6deeRGvq1dx1Dq89yxsTUHS8naE7ymqqZ9HGL3S7zpwFL4or72A2eaSZiC9UXhp+tHsVKtbLhkWUpQKgEwjJ4f6cabqjXuxyMb1UyQW23u6htDCSm+4UBb+HFPbvCStRuTM1qwIW9jyRwmk5UiAbg46kh26ImATY=
+    template:
+      - "`%{repository_slug}` \n*%{result}* build (<%{build_url}|#%{build_number}>) by %{author} for commit (<%{compare_url}|%{commit}>) on branch `%{branch}`."
+      - "Duration: *%{duration}*"
+      - "Message: %{message}"
